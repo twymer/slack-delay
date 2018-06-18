@@ -1,6 +1,6 @@
 /**
-* @param context {WebtaskContext}
-*/
+ * @param context {WebtaskContext}
+ */
 
 const { WebClient } = require('@slack/client');
 const moment = require('moment');
@@ -25,10 +25,8 @@ const parseMessage = (message) => {
   const messageRegex = /^(\d+) (hours|minutes) (.*)/;
   const splitMessage = messageRegex.exec(message);
 
-  // TODO Handle errors for bad message formatting
-  // TODO is this actually idiomatic for checking nulls?
   if (splitMessage !== null) {
-     return {
+    return {
       sendAt: moment().utc().add(splitMessage[1], splitMessage[2]).toDate(),
       text: splitMessage[3],
     };
