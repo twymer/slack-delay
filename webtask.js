@@ -60,13 +60,13 @@ const extractMessageData = (slackClient, context) => {
 };
 
 const saveMessage = (slackClient, context, messageData) => {
-  return context.storage.get(function (error, data) {
+  return context.storage.get((error, data) => {
     if (error) return cb(error);
     data = data || { messages: [] };
 
     data.messages.push(messageData);
 
-    context.storage.set(data, function (error) {
+    context.storage.set(data, (error) => {
       if (error) return cb(error);
     });
   });
@@ -79,14 +79,14 @@ const readyToSend = (message) => {
 };
 
 const sendMessages = (slackClient, context) => {
-  context.storage.get(function (error, data) {
+  context.storage.get((error, data) => {
     if (error) return cb(error);
     var messages = data.messages || [];
 
     // TODO Actually, be consistent in usage of new function call style
     // Iterate over messages and send those that are ready to go, meaning
     // messages that have a queued send time in the past.
-    messages.forEach(function (message) {
+    messages.forEach((message) => {
       if (readyToSend(message)) {
         // This doesn't wait on the Promise to finish before removing
         // but error handling is still a todo in general.
@@ -103,7 +103,7 @@ const sendMessages = (slackClient, context) => {
 
     // We have removed sent messages from the data object so updating
     // the storage will remove these from our queue.
-    context.storage.set(data, function (error) {
+    context.storage.set(data, (error) => {
       if (error) return cb(error);
     });
   });
@@ -115,12 +115,11 @@ const formatConfirmationMessage = (message) => {
   // Format here is:
   // `<!date^unixTimeStamp^stringWithFormatTags|backMessageIfCantConvert>`
   const queuedTime = moment(message.sendAt).unix();
-  return confirmationString = `<!date^${queuedTime}^Message successfully\
-                              queued for {date_pretty}\ at {time}|Message\
-                              succesfully queued.>`;
+  return `<!date^${queuedTime}^Message successfully queued for {date_pretty}\
+         at {time}|Message succesfully queued.>`;
 };
 
-module.exports = function(context, cb) {
+module.exports = (context, cb) => {
   const token = context.secrets.SLACK_TOKEN;
   const slackClient = new WebClient(token);
 
