@@ -72,18 +72,30 @@ const saveMessage = (slackClient, context, messageData) => {
   });
 };
 
+const filterMessages = (messages) => {
+};
+
 const sendMessages = (slackClient, context) => {
   // TODO Is there a good way to not have to duplicate this?
   context.storage.get(function (error, data) {
     if (error) return cb(error);
-    data = data || { messages: [] };
+    var messages = data.messages || [];
 
-    // TODO Do this async but I forget the function name
-    // TODO Don't just bulk send everything
-    data.messages.forEach(function (message) {
-      sendMessage(slackClient, message);
+    // TODO Clean this up, has to be a better way to split the list into
+    // the two (those to keep and those to send)
+    // TODO Actually, be consistent in usage of new function call style
+    // TODO This doesn't wait on the send or check errors before removing the item..
+    messages.forEach(function (message) {
+      if (moment().utc().isAfter(message.sendAt)) {
+        sendMessage(slackClient, message);
+        // Remove sent message
+        data.messages.splice(messages.indexOf(message), 1);
+      } else {
+        console.log("Not time to send yet!");
+        console.log(message.sendAt);
+        console.log(moment().utc().toDate());
+      }
     });
-    data = { messages: [] };
 
     context.storage.set(data, function (error) {
       if (error) return cb(error);
