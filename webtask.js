@@ -5,13 +5,10 @@
 const { WebClient } = require('@slack/client');
 const moment = require('moment');
 
-// TODO avoid having to pass client/context constantly?
-
 const sendMessage = (slackClient, messageData) => {
-  // TODO Update these success/error conditions
+  // Should better handle the case where the call to Slack doesn't succeed.
   slackClient.chat.postMessage(messageData.slackMessage)
     .then((res) => {
-      // `res` contains information about the posted message
       console.log('Message sent: ', res.ts);
     })
     .catch(console.error);
@@ -19,6 +16,8 @@ const sendMessage = (slackClient, messageData) => {
 
 const parseMessage = (message) => {
   // Messages come in the format of how long to delay and then the message
+  // Limited to minutes or hours, because really you shouldn't be queueing
+  // a Slack message for days in the future, should you?
   // Examples:
   // 30 minutes Hey, have you finished your TPS reports yet?
   // 5 hours No I was definitely not working at 4 am, again.
@@ -34,8 +33,6 @@ const parseMessage = (message) => {
 };
 
 const extractMessageData = (slackClient, context) => {
-  // TODO start with a hash and merge later
-  // instead of this mess
   const userId = context.body.user_id;
   const userName = context.body.user_name;
   const conversationId = context.body.channel_id;
@@ -58,6 +55,8 @@ const extractMessageData = (slackClient, context) => {
 };
 
 const saveMessage = (slackClient, context, messageData) => {
+  // Not using a proper database for simplicity here so just keeping a
+  // list of objects in the webtask storage for this.
   return context.storage.get((error, data) => {
     if (error) return cb(error);
     data = data || { messages: [] };
@@ -81,7 +80,6 @@ const sendMessages = (slackClient, context) => {
     if (error) return cb(error);
     var messages = data.messages || [];
 
-    // TODO Actually, be consistent in usage of new function call style
     // Iterate over messages and send those that are ready to go, meaning
     // messages that have a queued send time in the past.
     messages.forEach((message) => {
