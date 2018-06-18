@@ -60,7 +60,7 @@ const extractMessageData = (slackClient, context) => {
 };
 
 const saveMessage = (slackClient, context, messageData) => {
-  context.storage.get(function (error, data) {
+  return context.storage.get(function (error, data) {
     if (error) return cb(error);
     data = data || { messages: [] };
 
@@ -72,22 +72,26 @@ const saveMessage = (slackClient, context, messageData) => {
   });
 };
 
-const filterMessages = (messages) => {
+const readyToSend = (message) => {
+  // A message is ready to send if the time it is set to send at is
+  // in the past.
+  return moment().utc().isAfter(message.sendAt);
 };
 
 const sendMessages = (slackClient, context) => {
-  // TODO Is there a good way to not have to duplicate this?
   context.storage.get(function (error, data) {
     if (error) return cb(error);
     var messages = data.messages || [];
 
-    // TODO Clean this up, has to be a better way to split the list into
-    // the two (those to keep and those to send)
     // TODO Actually, be consistent in usage of new function call style
-    // TODO This doesn't wait on the send or check errors before removing the item..
+    // Iterate over messages and send those that are ready to go, meaning
+    // messages that have a queued send time in the past.
     messages.forEach(function (message) {
-      if (moment().utc().isAfter(message.sendAt)) {
+      if (readyToSend(message)) {
+        // This doesn't wait on the Promise to finish before removing
+        // but error handling is still a todo in general.
         sendMessage(slackClient, message);
+
         // Remove sent message
         data.messages.splice(messages.indexOf(message), 1);
       } else {
@@ -97,10 +101,23 @@ const sendMessages = (slackClient, context) => {
       }
     });
 
+    // We have removed sent messages from the data object so updating
+    // the storage will remove these from our queue.
     context.storage.set(data, function (error) {
       if (error) return cb(error);
     });
   });
+};
+
+const formatConfirmationMessage = (message) => {
+  // Slack provides some nice helpers for formatting dates and times
+  // in the users timezone, just have to set up the response string for it.
+  // Format here is:
+  // `<!date^unixTimeStamp^stringWithFormatTags|backMessageIfCantConvert>`
+  const queuedTime = moment(message.sendAt).unix();
+  return confirmationString = `<!date^${queuedTime}^Message successfully\
+                              queued for {date_pretty}\ at {time}|Message\
+                              succesfully queued.>`;
 };
 
 module.exports = function(context, cb) {
@@ -110,15 +127,18 @@ module.exports = function(context, cb) {
   // Determine if this is a slack command or a post request which
   // we will (naively) assume is coming from the cron job ping.
   if (context.body && context.body.command == '/delay') {
+    var queuedMessage;
+
     extractMessageData(slackClient, context)
       .then((res) => {
-        saveMessage(slackClient, context, res);
+        queuedMessage = res;
+        return saveMessage(slackClient, context, res);
+      })
+      .then((res) => {
+        cb(null, formatConfirmationMessage(queuedMessage));
       });
   } else {
     sendMessages(slackClient, context);
+    cb(null, {});
   }
-
-  // TODO what should I actually return here?
-  cb(null, 'Success!');
 };
-
