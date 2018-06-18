@@ -33,6 +33,9 @@ const parseMessage = (message) => {
 };
 
 const extractMessageData = (slackClient, context) => {
+  // Take the context object that comes from a Slack post request and
+  // extract the data we need to store to be able to later send the message
+  // that the user queued.
   const userId = context.body.user_id;
   const userName = context.body.user_name;
   const conversationId = context.body.channel_id;
@@ -55,8 +58,12 @@ const extractMessageData = (slackClient, context) => {
 };
 
 const saveMessage = (slackClient, context, messageData) => {
-  // Not using a proper database for simplicity here so just keeping a
+  // Save the parsed message to the queue of messages to be sent via
+  // scheduler later.
+
+  // NOTE: Not using a proper database for simplicity here so just keeping a
   // list of objects in the webtask storage for this.
+
   return context.storage.get((error, data) => {
     if (error) return cb(error);
     data = data || { messages: [] };
@@ -76,12 +83,12 @@ const readyToSend = (message) => {
 };
 
 const sendMessages = (slackClient, context) => {
+  // This method will go through pending messages and send those that are
+  // due to be sent (meaning those whose queued times are now in the past).
   context.storage.get((error, data) => {
     if (error) return cb(error);
     var messages = data.messages || [];
 
-    // Iterate over messages and send those that are ready to go, meaning
-    // messages that have a queued send time in the past.
     messages.forEach((message) => {
       if (readyToSend(message)) {
         // This doesn't wait on the Promise to finish before removing
