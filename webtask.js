@@ -6,8 +6,8 @@ const { WebClient } = require('@slack/client');
 const moment = require('moment');
 
 const sendMessage = (slackClient, messageData) => {
-  // Should better handle the case where the call to Slack doesn't succeed.
-  slackClient.chat.postMessage(messageData.slackMessage)
+  // Should better handle the case where the call to Slack fails.
+  return slackClient.chat.postMessage(messageData.slackMessage)
     .then((res) => {
       console.log('Message sent: ', res.ts);
     })
@@ -29,6 +29,8 @@ const parseMessage = (message) => {
       sendAt: moment().utc().add(splitMessage[1], splitMessage[2]).toDate(),
       text: splitMessage[3],
     };
+  } else {
+    // TODO error handling for invalid messages
   }
 };
 
@@ -87,27 +89,30 @@ const sendMessages = (slackClient, context) => {
   // due to be sent (meaning those whose queued times are now in the past).
   context.storage.get((error, data) => {
     if (error) return cb(error);
-    var messages = data.messages || [];
+    data = data || { messages: [] };
 
-    messages.forEach((message) => {
-      if (readyToSend(message)) {
-        // This doesn't wait on the Promise to finish before removing
-        // but error handling is still a todo in general.
-        sendMessage(slackClient, message);
 
-        // Remove sent message
-        data.messages.splice(messages.indexOf(message), 1);
-      } else {
-        console.log("Not time to send yet!");
-        console.log(message.sendAt);
-        console.log(moment().utc().toDate());
-      }
+    // Filter all ready to send messages then send them, removing from
+    // the queue when the send is successful
+    var messagePromises = data.messages.filter((message) => {
+      return readyToSend(message);
+    }).map((message) => {
+      return sendMessage(slackClient, message)
+        .then(() => {
+          data.messages.splice(data.messages.indexOf(message), 1);
+        });
     });
 
-    // We have removed sent messages from the data object so updating
-    // the storage will remove these from our queue.
-    context.storage.set(data, (error) => {
-      if (error) return cb(error);
+    // Since we need to write the state of the queue back to storage we will
+    // wait on all of the message send promises to complete first.
+    Promise.all(
+      messagePromises
+    ).then(() => {
+      // We have removed sent messages from the data object so updating
+      // the storage will remove these from our queue.
+      context.storage.set(data, (error) => {
+        if (error) return cb(error);
+      });
     });
   });
 };
@@ -134,9 +139,9 @@ module.exports = (context, cb) => {
     extractMessageData(slackClient, context)
       .then((res) => {
         queuedMessage = res;
-        return saveMessage(slackClient, context, res);
+        saveMessage(slackClient, context, res);
       })
-      .then((res) => {
+      .then(() => {
         cb(null, formatConfirmationMessage(queuedMessage));
       });
   } else {
