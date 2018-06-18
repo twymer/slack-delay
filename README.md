@@ -59,3 +59,9 @@ Examples:
 `/delay 45 minutes Hey Amy, hope you had a peaceful lunch! Do you have time this afternoon to review the pull request I assigned you on?`
 
 `/delay 8 hours Good morning Alex! I have some questions about the ticket you assigned me. Should the bike shed be blue or red?`
+
+Adding a new delay to Slack:  
+<img src="https://github.com/twymer/slack-delay/raw/master/screenshots/adding-delay.gif" width=50% />
+
+How it looks 5 minutes later:  
+<img src="https://github.com/twymer/slack-delay/raw/master/screenshots/end-result.png" width=50% />
